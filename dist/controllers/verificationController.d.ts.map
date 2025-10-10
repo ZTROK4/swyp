@@ -1,0 +1,1 @@
+{"version":3,"file":"verificationController.d.ts","sourceRoot":"","sources":["../../src/controllers/verificationController.ts"],"names":[],"mappings":"AAAA,OAAO,OAAO,MAAM,SAAS,CAAC;AAC9B,OAAO,KAAK,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAuBjD,eAAO,MAAM,iBAAiB,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,kBA+ClE,CAAC;AAGF,eAAO,MAAM,SAAS,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,oEAsB1D,CAAC"}
