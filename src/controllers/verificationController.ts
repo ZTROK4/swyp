@@ -22,158 +22,176 @@ const transporter = nodemailer.createTransport({
 });
 
 // Generate or update OTP
-export const createOrUpdateOTP = async (req: Request, res: Response) => {
-  const { userId, type } = req.body; // type = 'email' or 'phone'
-  const otp = generateOTP();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+export const createOrUpdatePhoneOTP = async (req: Request, res: Response) => {
+  const { phone } = req.body;
 
-  try {
-    // Check if a verification already exists for this user
-    const existing = await prisma.verification.findFirst({ where: { userId } });
-
-    if (existing) {
-      // Update existing OTP
-      await prisma.verification.update({
-        where: { id: existing.id },
-        data: type === "email"
-          ? { emailOtp: otp, expiresAt }
-          : { phoneOtp: otp, expiresAt },
-      });
-    } else {
-      // Create new verification
-      await prisma.verification.create({
-        data: {
-          userId,
-          emailOtp: type === "email" ? otp : null,
-          phoneOtp: type === "phone" ? otp : null,
-          expiresAt,
-        },
-      });
-    }
-
-    // Send OTP
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new Error("User not found");
-
-    if (type === "phone") {
-      if (!user.phone) throw new Error("User phone not found");
-      await twilioClient.messages.create({
-        body: `Your OTP is ${otp}`,
-        from: process.env.TWILIO_PHONE_NUMBER!,
-        to: user.phone,
-      });
-    } else if (type === "email") {
-      if (!user.email) throw new Error("User email not found");
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: "Your OTP Code",
-        text: `Your OTP is ${otp}`,
-      });
-    }
-
-    res.json({ message: "OTP generated and sent", otp });
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+  if (!phone) {
+    return res.status(400).json({ error: "Phone number is required" });
   }
-};
 
-export const createOrUpdateOTPsign = async (req: Request, res: Response) => {
-  const { email, phone, type } = req.body; // type = 'email' or 'phone'
   const otp = generateOTP();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 5 min expiry
 
   try {
-    // 1️⃣ Find or create user
-    let user = null;
-    if (type === "email" && email) {
-      user = await prisma.user.upsert({
-        where: { email },
-        update: {},
-        create: { phone,email },
-      });
-    } else if (type === "phone" && phone) {
-      user = await prisma.user.upsert({
+    // 1️⃣ Check if phone already exists in user table
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Phone number already in use" });
+    }
+
+    // 2️⃣ Check if verification already exists in PhoneVerification table
+    const existingVerification = await prisma.phoneVerification.findUnique({
+      where: { phone },
+    });
+
+    if (existingVerification) {
+      // Update OTP if record exists
+      await prisma.phoneVerification.update({
         where: { phone },
-        update: {},
-        create: { phone },
-      });
-    } else {
-      throw new Error("Email or phone is required for signup OTP");
-    }
-
-    // 2️⃣ Find existing verification
-    const existing = await prisma.verification.findFirst({ where: { userId: user.id } });
-
-    if (existing) {
-      // Update existing OTP
-      await prisma.verification.update({
-        where: { id: existing.id },
-        data: type === "email"
-          ? { emailOtp: otp, expiresAt }
-          : { phoneOtp: otp, expiresAt },
-      });
-    } else {
-      // Create new verification
-      await prisma.verification.create({
         data: {
-          userId: user.id,
-          emailOtp: type === "email" ? otp : null,
-          phoneOtp: type === "phone" ? otp : null,
+          otp,
+          expiresAt,
+          isVerified: false, // reset verification flag
+        },
+      });
+    } else {
+      // Create new verification record
+      await prisma.phoneVerification.create({
+        data: {
+          phone,
+          otp,
           expiresAt,
         },
       });
     }
 
-    // 3️⃣ Send OTP
-    if (type === "phone" && user.phone) {
-      await twilioClient.messages.create({
-        body: `Your OTP is ${otp}`,
-        from: process.env.TWILIO_PHONE_NUMBER!,
-        to: user.phone,
+    // 3️⃣ Send OTP via Twilio
+    await twilioClient.messages.create({
+      body: `Your verification OTP is ${otp}`,
+      from: process.env.TWILIO_PHONE_NUMBER!,
+      to: phone,
+    });
+
+    res.json({ message: "OTP sent successfully", phone });
+  } catch (err) {
+    console.error("OTP generation error:", err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+};
+
+
+export const createOrUpdateEmailOTP = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  const otp = generateOTP();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 5 min expiry
+
+  try {
+    // 1️⃣ Check if email already exists in user table
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already in use" });
+    }
+
+    // 2️⃣ Check if verification already exists in EmailVerification table
+    const existingVerification = await prisma.emailVerification.findUnique({
+      where: { email },
+    });
+
+    if (existingVerification) {
+      // Update OTP if record exists
+      await prisma.emailVerification.update({
+        where: { email },
+        data: {
+          otp,
+          expiresAt,
+          isVerified: false, // reset verification flag
+        },
       });
-    } else if (type === "email" && user.email) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: "Your OTP Code",
-        text: `Your OTP is ${otp}`,
+    } else {
+      // Create new verification record
+      await prisma.emailVerification.create({
+        data: {
+          email,
+          otp,
+          expiresAt,
+        },
       });
     }
 
-    res.json({ message: "OTP generated and sent", otp, userId: user.id });
+    // 3️⃣ Send OTP via Nodemailer
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your verification OTP",
+      text: `Your OTP is ${otp}`,
+    });
+
+    res.json({ message: "OTP sent successfully", email });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    console.error("Email OTP generation error:", err);
+    res.status(500).json({ error: (err as Error).message });
   }
 };
+
 
 
 // Verify OTP
-export const verifyOTP = async (req: Request, res: Response) => {
-  const { userId, otp, type } = req.body;
+// Verify phone OTP
+export const verifyPhoneOTP = async (req: Request, res: Response) => {
+  const { phone, otp } = req.body;
+
+  if (!phone || !otp) {
+    return res.status(400).json({ error: "Phone and OTP are required" });
+  }
+
   try {
-    // Find existing verification
-    const verification = await prisma.verification.findFirst({ where: { userId } });
+    const verification = await prisma.phoneVerification.findUnique({ where: { phone } });
     if (!verification) return res.status(404).json({ error: "No verification found" });
 
-    // Check OTP
-    const isValid =
-      (type === "email" && verification.emailOtp === otp) ||
-      (type === "phone" && verification.phoneOtp === otp);
+    if (verification.otp !== otp) {
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
 
-    if (!isValid) return res.status(400).json({ error: "Invalid OTP" });
-
-    // Mark as verified
-    await prisma.verification.update({
-      where: { id: verification.id }, // must use unique id
-      data:
-        type === "email"
-          ? { isEmailVerified: true }
-          : { isPhoneVerified: true },
+    await prisma.phoneVerification.update({
+      where: { phone },
+      data: { isVerified: true },
     });
 
-    res.json({ message: "Verified successfully" });
+    res.json({ message: "Phone verified successfully" });
   } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
   }
 };
+
+// Verify email OTP
+export const verifyEmailOTP = async (req: Request, res: Response) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ error: "Email and OTP are required" });
+  }
+
+  try {
+    const verification = await prisma.emailVerification.findUnique({ where: { email } });
+    if (!verification) return res.status(404).json({ error: "No verification found" });
+
+    if (verification.otp !== otp) {
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
+
+    await prisma.emailVerification.update({
+      where: { email },
+      data: { isVerified: true },
+    });
+
+    res.json({ message: "Email verified successfully" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+};
+
