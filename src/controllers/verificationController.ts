@@ -46,12 +46,18 @@ export const createOrUpdatePhoneOTP = async (req: Request, res: Response) => {
 
     if (existingVerification) {
       // Update OTP if record exists
-      await prisma.phoneVerification.update({
-        where: { phone },
-        data: {
+      await prisma.phoneVerification.upsert({
+        where: { phone }, // must be a unique field
+        update: {
           otp,
           expiresAt,
           isVerified: false, // reset verification flag
+        },
+        create: {
+          phone,
+          otp,
+          expiresAt,
+          isVerified: false,
         },
       });
     } else {
@@ -104,14 +110,21 @@ export const createOrUpdateEmailOTP = async (req: Request, res: Response) => {
 
     if (existingVerification) {
       // Update OTP if record exists
-      await prisma.emailVerification.update({
-        where: { email },
-        data: {
+      await prisma.emailVerification.upsert({
+        where: { email }, // must be a unique field
+        update: {
           otp,
           expiresAt,
           isVerified: false, // reset verification flag
         },
+        create: {
+          email,
+          otp,
+          expiresAt,
+          isVerified: false,
+        },
       });
+
     } else {
       // Create new verification record
       await prisma.emailVerification.create({
