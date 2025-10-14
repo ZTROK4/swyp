@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createOrUpdateEmailOTP, createOrUpdatePhoneOTP, verifyEmailOTP, verifyPhoneOTP } from "../controllers/verificationController";
+import { createOrUpdateEmailOTP, createOrUpdatePhoneOTP, verifyEmailOTP, verifyPhoneOTP } from "../controllers/verificationController.js";
 
 const router = Router();
 
