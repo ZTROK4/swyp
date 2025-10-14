@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
-import userRouter from "./routes/userRoutes";
-import verificationRouter from "./routes/verificationRoutes";
+import userRouter from "./routes/userRoutes.js";
+import verificationRouter from "./routes/verificationRoutes.js";
 
 const app = express();
 
