@@ -1,49 +1,18 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
-    // "rootDir": "./src",
-    // "outDir": "./dist",
-
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    "target": "ES2020",                  // modern JS features
-    "module": "ESNext",  
-    "types": [],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
-
-    // Other Outputs
-
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
-     "moduleResolution": "node",          // Node module resolution
-    "rootDir": "src",                     // TS source files
-    "outDir": "dist",                     // compiled JS output
-    "strict": true,                       // strict type checking
-    "esModuleInterop": true,              // allows default imports from CJS modules
-    "forceConsistentCasingInFileNames": true,               // skip checking types of node_modules
-    "declaration": true,                  // optional: generates .d.ts files
-    "declarationMap": true,               // optional
-    "sourceMap": true ,
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"],             // include all TS files in src
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]
 }
+
