@@ -1,7 +1,11 @@
 import express from "express";
 import type { Request, Response } from "express";
 import prisma from "../utils/prisma.js";
+import jwt from "jsonwebtoken";
+ // adjust path as needed
 
+// Use an environment variable for the secret key
+const JWT_SECRET = process.env.JWT_SECRET || "dogitis";
 
 export const createUser = async (req: Request, res: Response) => {
   try {
@@ -11,7 +15,7 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Phone number is required." });
     }
 
-    //  Check if the phone number is verified
+    // 1️⃣ Check if the phone number is verified
     const phoneVerification = await prisma.phoneVerification.findUnique({
       where: { phone },
     });
@@ -20,15 +24,18 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Phone number not verified." });
     }
 
-    //  Prevent creating duplicate users
+    // 2️⃣ Prevent creating duplicate users
     const existingUser = await prisma.user.findUnique({
       where: { phone },
     });
+
     if (existingUser) {
-      return res.status(400).json({ error: "User already exists with this phone number." });
+      return res
+        .status(400)
+        .json({ error: "User already exists with this phone number." });
     }
 
-    // Create the user (email ignored)
+    // 3️⃣ Create the user (email ignored)
     const user = await prisma.user.create({
       data: {
         phone,
@@ -38,8 +45,17 @@ export const createUser = async (req: Request, res: Response) => {
       },
     });
 
+    // 4️⃣ Generate JWT token (id + name)
+    const token = jwt.sign(
+      { id: user.id, name: user.name },
+      JWT_SECRET,
+      { expiresIn: "7d" } // token expires in 7 days
+    );
+
+    // 5️⃣ Return success + token
     res.status(201).json({
       message: "User created successfully",
+      token,
       user,
     });
   } catch (err) {
@@ -50,21 +66,39 @@ export const createUser = async (req: Request, res: Response) => {
 
 export const addOrUpdateEmail = async (req: Request, res: Response) => {
   try {
-    const { id, email } = req.body;
+    const { email } = req.body;
 
-    if (!id || !email) {
-      return res.status(400).json({ error: "User ID and email are required." });
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
     }
 
-    // 1️⃣ Check if the user exists
+    // 1️⃣ Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authorization token missing or invalid." });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // 2️⃣ Verify and decode the token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as { id: number; name?: string };
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid or expired token." });
+    }
+
+    const userId = decoded.id;
+
+    // 3️⃣ Check if the user exists
     const user = await prisma.user.findUnique({
-      where: { id: Number(id) },
+      where: { id: userId },
     });
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // 2️⃣ Check if the email exists and is verified
+    // 4️⃣ Check if the email is verified
     const emailVerification = await prisma.emailVerification.findUnique({
       where: { email },
     });
@@ -75,7 +109,7 @@ export const addOrUpdateEmail = async (req: Request, res: Response) => {
         .json({ error: "Email is not verified. Please verify before linking." });
     }
 
-    // 3️⃣ Check if the email is already used by another user
+    // 5️⃣ Check if email already belongs to another user
     const existingUserWithEmail = await prisma.user.findUnique({
       where: { email },
     });
@@ -85,16 +119,16 @@ export const addOrUpdateEmail = async (req: Request, res: Response) => {
         .json({ error: "Email is already in use by another user." });
     }
 
-    // 4️⃣ Update user's email
+    // 6️⃣ Update user's email
     const updatedUser = await prisma.user.update({
-      where: { id: Number(id) },
+      where: { id: userId },
       data: { email },
     });
 
-    // 5️⃣ (Optional) Invalidate the email verification entry
+    // 7️⃣ Invalidate email verification entry (optional)
     await prisma.emailVerification.update({
       where: { email },
-      data: { isVerified: false }, // reset so it can’t be reused
+      data: { isVerified: false },
     });
 
     res.status(200).json({
@@ -106,6 +140,8 @@ export const addOrUpdateEmail = async (req: Request, res: Response) => {
     res.status(500).json({ error: (err as Error).message });
   }
 };
+
+
 
 export const getUser = async (req: Request, res: Response) => {
   try {
