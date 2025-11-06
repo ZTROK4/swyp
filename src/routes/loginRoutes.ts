@@ -4,6 +4,6 @@ import { sendPhoneOtp,verifyPhoneOtp  } from "../controllers/loginController.js"
 const router = Router();
 
 router.post("/sendotp", sendPhoneOtp);
-router.post("/verifyOtp",verifyPhoneOtp);
+router.post("/verifyotp",verifyPhoneOtp);
 
 export default router;
