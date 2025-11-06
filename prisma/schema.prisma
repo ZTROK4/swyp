@@ -15,15 +15,31 @@ datasource db {
 }
 
 model User {
-  id             Int             @id @default(autoincrement())
-  email          String?         @unique
-  phone          String          @unique
-  name           String?
-  gender         String?         // e.g. "Male", "Female", "Other"
-  dob            DateTime?       // Date of Birth
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                   Int             @id @default(autoincrement())
+  userCode             String?         @unique              // e.g. "U0001"
+  email                String?         @unique
+  phone                String?         @unique
+  name                 String?
+  gender               String?         // "Male", "Female", "Other"
+  dob                  DateTime?
+  age                  Int?
+  signupDate           DateTime        @default(now())
+  preferredCategories  String[]        // ["Electronics", "Shoes"]
+  avgPriceMin          Float?          // e.g. 1500
+  avgPriceMax          Float?          // e.g. 3500
+  totalPurchases       Int?            @default(0)
+  totalViews           Int?            @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  // Relations
+  interactions         Interaction[]
 }
+
+
+////////////////////////////////////////////////////////////
+// 🔐 VERIFICATION (unchanged)
+////////////////////////////////////////////////////////////
 
 model PhoneVerification {
   id              Int      @id @default(autoincrement())
@@ -41,4 +57,74 @@ model EmailVerification {
   isVerified      Boolean  @default(false)
   createdAt       DateTime @default(now())
   expiresAt       DateTime
+}
+
+////////////////////////////////////////////////////////////
+// 🛍️ PRODUCT SECTION
+////////////////////////////////////////////////////////////
+
+model Product {
+  id                 Int           @id @default(autoincrement())
+  productCode        String        @unique                // e.g. "P101"
+  title              String
+  badge              String?                              // "New", "Hot", "Sale"
+  description        String?
+  composition        String?                              // material info
+  shippingInfo       String?                              // shipping description
+  price              Float
+  compareAtPrice     Float?                               // original MRP for discounts
+  stockAvailable     Int            @default(0)           // total in stock
+  sizingAvailability String?                              // e.g. "S,M,L,XL"
+  sizeChartUrl       String?
+  color              String?
+  specs              String?                              // specs text / bullet list
+  category           String
+  subCategory        String?
+  brand              String?
+  tags               String[]                             // ["sporty", "lightweight", "mesh"]
+  averageRating      Float?          @default(0)
+  viewsCount         Int             @default(0)
+  purchaseCount      Int             @default(0)
+  addedDate          DateTime        @default(now())
+  images             ProductImage[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations
+  interactions       Interaction[]
+}
+
+model ProductImage {
+  id          Int      @id @default(autoincrement())
+  product     Product  @relation(fields: [productId], references: [id])
+  productId   Int
+  imageUrl    String
+  displayOrder Int?    // 1, 2, 3, 4 for ordering images
+}
+
+////////////////////////////////////////////////////////////
+// ⚙️ INTERACTIONS (views, cart, purchases, etc.)
+////////////////////////////////////////////////////////////
+
+model Interaction {
+  id           Int       @id @default(autoincrement())
+  user         User      @relation(fields: [userId], references: [id])
+  userId       Int
+  product      Product   @relation(fields: [productId], references: [id])
+  productId    Int
+  eventType    EventType // "view" | "add_to_cart" | "purchase"
+  sessionId    String?
+  durationSec  Int?      // time spent viewing
+  timestamp    DateTime  @default(now())
+  rating       Float?
+
+  @@index([userId])
+  @@index([productId])
+  @@index([eventType])
+}
+
+enum EventType {
+  view
+  add_to_cart
+  purchase
 }

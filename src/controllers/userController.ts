@@ -15,7 +15,7 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Phone number is required." });
     }
 
-    // 1️⃣ Check if the phone number is verified
+    // 1️⃣ Verify phone number
     const phoneVerification = await prisma.phoneVerification.findUnique({
       where: { phone },
     });
@@ -24,43 +24,62 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Phone number not verified." });
     }
 
-    // 2️⃣ Prevent creating duplicate users
+    // 2️⃣ Prevent duplicates
     const existingUser = await prisma.user.findUnique({
       where: { phone },
     });
 
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ error: "User already exists with this phone number." });
+      return res.status(400).json({
+        error: "User already exists with this phone number.",
+      });
     }
 
-    // 3️⃣ Create the user (email ignored)
+    // 3️⃣ Create user (without userCode first)
+    let age: number | undefined = undefined;
+    if (dob) {
+      const birth = new Date(dob);
+      const now = new Date();
+      age = now.getFullYear() - birth.getFullYear();
+      const monthDiff = now.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+        age--;
+      }
+    }
+
     const user = await prisma.user.create({
       data: {
         phone,
         name,
         gender,
         dob: dob ? new Date(dob) : undefined,
+        age,
       },
     });
 
-    // 4️⃣ Generate JWT token (id + name)
+    // 4️⃣ Generate userCode ("U0001" style)
+    const formattedCode = `U${String(user.id).padStart(4, "0")}`;
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { userCode: formattedCode },
+    });
+
+    // 5️⃣ Generate JWT token
     const token = jwt.sign(
-      { id: user.id, name: user.name },
+      { id: updatedUser.id, name: updatedUser.name },
       JWT_SECRET,
-      { expiresIn: "7d" } // token expires in 7 days
+      { expiresIn: "7d" }
     );
 
-    // 5️⃣ Return success + token
+    // 6️⃣ Return success response
     res.status(201).json({
       message: "User created successfully",
       token,
-      user,
+      user: updatedUser,
     });
   } catch (err) {
     console.error("Error creating user:", err);
-    res.status(400).json({ error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
   }
 };
 
